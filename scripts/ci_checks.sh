@@ -24,7 +24,7 @@ check_content() {
   p1=$(git grep -nIE 'AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|xox[bp]-[A-Za-z0-9-]{20,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{32,}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- . ':!*.md' ':!.env.example' | grep -v 'AKIAIOSFODNN7EXAMPLE' | cut -d: -f1,2 || true)
   [ -n "$p1" ] && out="$out"$'\n'"[token or private key]"$'\n'"$p1"
   # database URLs with credentials, except local defaults, placeholders and variable references
-  p2=$(git grep -nIE 'postgres(ql)?(\+[a-z0-9]+)?://[^:/@[:space:]"'"'"']+:[^@[:space:]"'"'"']+@' -- . ':!*.md' ':!.env.example' | grep -vE '@(localhost|127\.0\.0\.1|postgres)(:|/)|USER:PASSWORD@|\$\{|%s|\{[a-z_]+\}|user:pass|username:password' | cut -d: -f1,2 || true)
+  p2=$(git grep -nIE 'postgres(ql)?(\+[a-z0-9]+)?://[^:/@[:space:]"'"'"']+:[^@[:space:]"'"'"']+@' -- . ':!*.md' ':!.env.example' | grep -vE '@(localhost|127\.0\.0\.1|postgres)(:|/)|USER:PASSWORD@|\$\{|%s|\{[a-z_]+\}|user:pass|username:password|:\*\*\*@' | cut -d: -f1,2 || true)
   [ -n "$p2" ] && out="$out"$'\n'"[database URL with credentials]"$'\n'"$p2"
   # hardcoded password / secret assignments to a non-empty string literal
   p3=$(git grep -nIiE '(password|passwd|secret|api_key|apikey|token)[a-z_]*["'"'"']? *[:=] *["'"'"'][^"'"'"'$ {}<]{8,}["'"'"']' -- '*.py' '*.js' '*.jsx' '*.yml' '*.yaml' '*.ts' ':!*test*' ':!*Test*' ':!*demo*' ':!*sample*' ':!*smoke*' ':!*.min.js' ':!Frontend/src/pages/Login.jsx' | grep -viE 'example|changeme|your[-_]|placeholder|<[a-z_]+>|os\.(getenv|environ)|process\.env|\$\{' | cut -d: -f1,2 || true)
