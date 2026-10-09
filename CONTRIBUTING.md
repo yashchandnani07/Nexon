@@ -15,46 +15,11 @@ Read this once before your first commit. It is short.
 their issue or open a new issue and assign it to them. This is what keeps four people from
 overwriting each other.
 
-## 2. Two kinds of issues, two ways to push
+## 2. Nobody pushes to `main`
 
-### A. "Import baseline" issues → push directly to `main`
-
-These issues bring an existing module folder into the repo. Nobody else touches your
-folders, so there is nothing to review and no conflict to resolve.
-
-```bash
-git checkout main
-```
-
-```bash
-git pull --rebase origin main
-```
-
-Copy the folder(s) named in the issue from your local project folder into the repo folder, then:
-
-```bash
-git add <folder>
-```
-
-```bash
-git status --short
-```
-
-Read the list. Stop if you see `.env`, `*.db`, `node_modules`, `*.log`, or any personal file.
-
-```bash
-git commit -m "chore(<module>): import baseline <module> module"
-```
-
-```bash
-git pull --rebase origin main
-```
-
-```bash
-git push origin main
-```
-
-### B. Every other issue → branch, small pushes, pull request
+Every issue, including the "import baseline" ones, is done on a branch and merged through a
+pull request. Branch names: `feat/<issue-number>-<short-name>`, or
+`chore/<issue-number>-<short-name>` for imports.
 
 ```bash
 git checkout main
@@ -68,13 +33,18 @@ git pull --rebase origin main
 git checkout -b feat/<issue-number>-<short-name>
 ```
 
-Example: `git checkout -b feat/7-credential-scan-history`
-
 Work in small steps. **Commit and push after each step that works**, not once at the end:
 
 ```bash
-git add <files you changed>
+git add <only the files this issue names>
 ```
+
+```bash
+git status --short
+```
+
+Read the list. Stop if you see `.env`, `*.db`, `node_modules`, `*.log` or any file the issue
+did not ask for.
 
 ```bash
 git commit -m "feat(credential-scanner): add db.py with credential_scans table"
@@ -84,10 +54,17 @@ git commit -m "feat(credential-scanner): add db.py with credential_scans table"
 git push -u origin feat/<issue-number>-<short-name>
 ```
 
-When the checklist in the issue is complete, open a pull request into `main`. Put
-`Closes #<issue-number>` in the description. Merge it yourself once your service builds and
-the "How to test" steps in the issue pass. Use **Squash and merge** only if your branch has
-messy commits; otherwise use a normal merge.
+### Rules
+
+1. Push only what the issue explicitly asks, even if you have the whole project locally.
+2. Small, regular commits. Never push hundreds of lines at once at the end. Your history must
+   show how the work was really done.
+3. Read the issue's files and these docs before writing code.
+4. Before the PR: build the service, run the issue's "How to test" steps (API calls, and the
+   web page if relevant), then re-read the issue and tick every checklist box.
+5. Open the PR only when the issue is 100% done. Put `Closes #<number>` in the description,
+   paste your test output, and use the PR template.
+6. Never push to `main` directly.
 
 ## 3. `main` must always build
 
@@ -96,7 +73,7 @@ Every Pull Request automatically triggers the GitHub Actions CI pipeline (`.gith
 2. Dynamically discovers all Docker services in the repository and verifies they build successfully.
 3. Validates the frontend build bundle if `Frontend/` is present.
 
-Before pushing and opening your PR, test your service locally:
+Before every PR, also build your service locally:
 
 ```bash
 docker compose build <service-name>
