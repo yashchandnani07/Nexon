@@ -144,3 +144,75 @@ You needPython 3.10+ installed.
 3. Click **Load unpacked** and select the `/extension/` folder from this project.
 4. Pin the `PhishGuard` shield icon to your toolbar.
 5. Open any website and click the shield! It will read the actual real browser cookies and instantly check them against the running Flask API.
+
+---
+
+## 📡 6. API Reference (`flask_api.py`)
+
+All API routes with example `curl` commands:
+
+### `GET /`
+Serves the web dashboard (`dashboard/index.html`).
+```bash
+curl -s http://localhost:8008/
+```
+
+### `GET /health`
+Health check endpoint reporting service status, name, and version.
+```bash
+curl -s http://localhost:8008/health
+```
+Response:
+```json
+{"service":"PhishGuard Full Pipeline API","status":"ok","version":"2.0"}
+```
+
+### `POST /analyze`
+Full multi-check URL analysis pipeline (XGBoost ML, SSL handshake, WHOIS/DNS lookup, cookie inspection, DOM/HTML scraping).
+```bash
+curl -s -X POST http://localhost:8008/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"url":"http://paypa1-secure-login.xyz/verify"}'
+```
+
+### `POST /analyze/fast`
+Fast inline analysis endpoint (ML model + URL encoding checks + client cookies) with no outbound network lookups.
+```bash
+curl -s -X POST http://localhost:8008/analyze/fast \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","cookies":[]}'
+```
+
+### `POST /feedback`
+Submits analyst or user feedback / ground-truth classification on a previous scan.
+```bash
+curl -s -X POST http://localhost:8008/feedback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scan_id": 1,
+    "url": "http://paypa1-secure-login.xyz/verify",
+    "model_verdict": "DANGEROUS",
+    "correct_verdict": "DANGEROUS",
+    "reviewer_id": "analyst1",
+    "notes": "Verified phishing portal"
+  }'
+```
+
+### `GET /feedback/stats`
+Retrieves aggregated statistics on feedback counts, accuracy, false positives/negatives, and retraining queue size.
+```bash
+curl -s http://localhost:8008/feedback/stats
+```
+
+### `POST /admin/retrain`
+Admin trigger to consume queued feedback and retrain the URL phishing XGBoost model.
+```bash
+curl -s -X POST http://localhost:8008/admin/retrain
+```
+
+### `GET /admin/retrain/status`
+Retrieves current retraining status, queue size, and feedback accuracy metrics.
+```bash
+curl -s http://localhost:8008/admin/retrain/status
+```
+
