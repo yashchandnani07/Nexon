@@ -1,0 +1,56 @@
+{
+  "aws_access_key_id": {
+    "regex": "\\bAKIA[0-9A-Z]{16}\\b",
+    "desc": "AWS access key identifier",
+    "risk": "Critical",
+    "category": "cloud_key"
+  },
+  "aws_secret_access_key": {
+    "regex": "(?i)aws_secret_access_key\\s*[:=]\\s*['\"]?([A-Za-z0-9/+=]{40})",
+    "desc": "AWS secret access key assignment",
+    "risk": "Critical",
+    "category": "cloud_key"
+  },
+  "private_key_header": {
+    "regex": "-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+    "desc": "Private key material",
+    "risk": "Critical",
+    "category": "cryptographic"
+  },
+  "jwt_token": {
+    "regex": "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\b",
+    "desc": "JSON Web Token",
+    "risk": "High",
+    "category": "auth_token"
+  },
+  "generic_password_assignment": {
+    "regex": "(?i)\\b(?:password|passwd|pwd)\\s*[:=]\\s*['\"]?[^\\s'\"]{8,}",
+    "desc": "Password value in a key-value assignment",
+    "risk": "High",
+    "category": "credential"
+  },
+  "generic_api_key_assignment": {
+    "regex": "(?i)\\b(?:api[_-]?key|access[_-]?token|client[_-]?secret)\\s*[:=]\\s*['\"]?[A-Za-z0-9_./+=-]{16,}",
+    "desc": "API key or token in a key-value assignment",
+    "risk": "High",
+    "category": "api_key"
+  },
+  "credit_card_number": {
+    "regex": "(?<!\\d)(?:\\d[ -]*?){13,19}(?!\\d)",
+    "desc": "Possible payment card number",
+    "risk": "High",
+    "category": "payment"
+  },
+  "iban": {
+    "regex": "\\b[A-Z]{2}\\d{2}[A-Z0-9]{11,30}\\b",
+    "desc": "International bank account number",
+    "risk": "High",
+    "category": "financial"
+  },
+  "database_connection_uri": {
+    "regex": "(?i)\\b(?:postgres(?:ql)?|mysql|mongodb(?:\\+srv)?):\\/\\/[^\\s:@/]+:[^\\s@/]+@[^\\s/]+",
+    "desc": "Database connection URI containing credentials",
+    "risk": "Critical",
+    "category": "database_credential"
+  }
+}
