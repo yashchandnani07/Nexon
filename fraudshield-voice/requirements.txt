@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-multipart
+websockets
+pydantic
+numpy
+librosa
+torch
+scikit-learn
+openai-whisper
+pydub
+shap
+audiomentations
+ollama
+psycopg2-binary
+asyncpg
+SQLAlchemy
