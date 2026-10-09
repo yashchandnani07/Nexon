@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Install garak from PyPI (stable release)
+RUN pip install --no-cache-dir garak
+
+# Garak config pointing at our ollama container
+COPY docker/garak_config.yaml /app/garak_config.yaml
+
+RUN mkdir -p /app/garak_runs
+
+# Default: run dan + injection + encoding probes
+CMD ["python", "-m", "garak", \
+     "--config", "/app/garak_config.yaml", \
+     "--model_type", "ollama", \
+     "--model_name", "phi3:mini", \
+     "--probes", "dan,encoding,injection,knownbadsignatures,continuation", \
+     "--generations", "3", \
+     "--report_prefix", "/app/garak_runs/scan"]

@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Security Sandbox</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg:       #0a0a0f;
+    --surface:  #111118;
+    --surface2: #1a1a24;
+    --border:   #2a2a3a;
+    --border2:  #3a3a50;
+    --text:     #e8e8f0;
+    --muted:    #6a6a8a;
+    --accent:   #7c6cfa;
+    --accent2:  #fa6c8c;
+    --green:    #4ade9a;
+    --amber:    #facc4a;
+    --red:      #fa4a6c;
+    --mono:     'Space Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ── */
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 36px; height: 36px; border: 1.5px solid var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--accent);
+  }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+  .logo-tag  { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .1em; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
+  .status-dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  .status-text { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* ── Hero ── */
+  .hero { padding: 72px 0 48px; text-align: center; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border2); border-radius: 100px;
+    padding: 6px 16px; font-family: var(--mono); font-size: 11px;
+    color: var(--accent); letter-spacing: .08em; margin-bottom: 28px;
+  }
+  .hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  h1 {
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -.02em;
+    margin-bottom: 20px;
+  }
+  h1 span { color: var(--accent); }
+  .hero-sub { font-size: 16px; color: var(--muted); max-width: 520px; margin: 0 auto 48px; line-height: 1.6; font-weight: 400; }
+
+  /* ── Dimension pills ── */
+  .dim-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 64px; }
+  .pill {
+    border: 1px solid var(--border2); border-radius: 100px;
+    padding: 5px 14px; font-family: var(--mono); font-size: 10px;
+    color: var(--muted); letter-spacing: .05em;
+  }
+  .pill.critical { border-color: #fa4a6c44; color: var(--red); }
+  .pill.high     { border-color: #facc4a44; color: var(--amber); }
+  .pill.medium   { border-color: #7c6cfa44; color: var(--accent); }
+
+  /* ── Main card ── */
+  .main-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .card-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 16px 24px;
+    font-family: var(--mono); font-size: 12px; letter-spacing: .05em;
+    color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .2s; user-select: none;
+  }
+  .tab.active { color: var(--text); border-color: var(--accent); }
+  .tab-panel { display: none; padding: 32px; }
+  .tab-panel.active { display: block; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(124,108,250,.04); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .upload-icon {
+    width: 56px; height: 56px; margin: 0 auto 16px;
+    border: 1.5px solid var(--border2); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+  .upload-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .upload-sub { font-size: 13px; color: var(--muted); }
+  .upload-formats { margin-top: 12px; font-family: var(--mono); font-size: 10px; color: var(--border2); }
+
+  /* ── File selected state ── */
+  .file-selected {
+    display: none;
+    align-items: center; gap: 16px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 16px 20px; margin-top: 16px;
+  }
+  .file-selected.show { display: flex; }
+  .file-icon { font-size: 28px; flex-shrink: 0; }
+  .file-name { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .file-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .file-remove { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px; }
+  .file-remove:hover { color: var(--red); }
+
+  /* ── Form fields ── */
+  .field-group { margin-top: 24px; }
+  label { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; margin-bottom: 8px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  select, input[type=text] {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 11px 14px;
+    font-family: var(--mono); font-size: 13px; color: var(--text);
+    appearance: none; outline: none; transition: border-color .2s;
+  }
+  select:focus, input[type=text]:focus { border-color: var(--accent); }
+  .select-wrap { position: relative; }
+  .select-wrap::after {
+    content: '▾'; position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 12px;
+  }
+
+  /* ── Checkboxes (dimensions) ── */
+  .dim-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+  .dim-check {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; transition: all .15s; user-select: none;
+  }
+  .dim-check:hover { border-color: var(--border2); }
+  .dim-check input { display: none; }
+  .dim-check.checked { border-color: var(--accent); background: rgba(124,108,250,.06); }
+  .check-box {
+    width: 16px; height: 16px; border: 1.5px solid var(--border2);
+    border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; transition: all .15s;
+  }
+  .dim-check.checked .check-box { background: var(--accent); border-color: var(--accent); }
+  .check-label { font-size: 12px; font-weight: 600; }
+  .check-sev { font-family: var(--mono); font-size: 9px; margin-left: auto; }
+  .sev-c { color: var(--red); }
+  .sev-h { color: var(--amber); }
+  .sev-m { color: var(--accent); }
+
+  /* ── Toggle ── */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--border); margin-top: 16px; }
+  .toggle-info h4 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .toggle-info p  { font-size: 11px; color: var(--muted); }
+  .toggle-switch {
+    width: 44px; height: 24px; background: var(--border2); border-radius: 100px;
+    position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--accent); }
+  .toggle-switch::after {
+    content: ''; position: absolute; width: 18px; height: 18px;
+    background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s;
+  }
+  .toggle-switch.on::after { left: 23px; }
+
+  /* ── Scan button ── */
+  .scan-btn {
+    width: 100%; margin-top: 28px;
+    background: var(--accent); border: none; border-radius: 10px;
+    padding: 16px; font-family: var(--sans); font-size: 15px; font-weight: 700;
+    color: #fff; cursor: pointer; transition: all .2s; letter-spacing: .01em;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .scan-btn:hover { background: #6a5ce8; transform: translateY(-1px); }
+  .scan-btn:active { transform: translateY(0); }
+  .scan-btn:disabled { background: var(--border2); color: var(--muted); cursor: not-allowed; transform: none; }
+
+  /* ── Progress panel ── */
+  .progress-panel { display: none; }
+  .progress-panel.show { display: block; }
+  .progress-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress-title { font-size: 15px; font-weight: 700; }
+  .progress-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    margin-bottom: 20px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .progress-bar-track {
+    height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 8px;
+  }
+  .progress-bar-fill {
+    height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #a88bff);
+    border-radius: 4px; transition: width 0.6s ease;
+  }
+  .progress-bar-meta {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .progress-bar-sub  { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .progress-bar-pct  { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); }
+
+  .dim-progress-list { display: flex; flex-direction: column; gap: 8px; }
+  .dim-progress-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .dp-status { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .dp-status.waiting  { background: var(--border2); color: var(--muted); }
+  .dp-status.running  { background: rgba(124,108,250,.2); border: 1.5px solid var(--accent); }
+  .dp-status.done     { background: rgba(74,222,154,.2); color: var(--green); }
+  .dp-status.failed   { background: rgba(250,74,108,.2); color: var(--red); }
+  .dp-spin { width: 10px; height: 10px; border: 1.5px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin .6s linear infinite; }
+  .dp-name { font-size: 13px; font-weight: 600; flex: 1; }
+  .dp-result { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .log-box {
+    margin-top: 16px; background: #050508; border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; font-family: var(--mono); font-size: 11px;
+    color: var(--muted); height: 180px; overflow-y: auto; line-height: 1.9;
+  }
+  .log-line { margin-bottom: 1px; white-space: pre-wrap; word-break: break-all; }
+  .log-line.ok  { color: var(--green); }
+  .log-line.err { color: var(--red); }
+  .log-line.info{ color: var(--accent); }
+  .log-line.prompt { color: #8888aa; }
+
+  /* ── Results panel ── */
+  .results-panel { display: none; }
+  .results-panel.show { display: block; }
+
+  .risk-banner {
+    border-radius: 12px; padding: 24px 28px;
+    display: flex; align-items: center; gap: 24px;
+    margin-bottom: 24px; border: 1px solid;
+  }
+  .risk-score-circle {
+    width: 80px; height: 80px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex-shrink: 0; border: 3px solid currentColor;
+  }
+  .risk-score-circle .num { font-size: 26px; font-weight: 800; font-family: var(--mono); }
+  .risk-score-circle .den { font-size: 10px; opacity: .7; font-family: var(--mono); }
+  .risk-info h2 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .risk-info p  { font-size: 12px; opacity: .75; }
+  .risk-stats { margin-left: auto; display: flex; gap: 20px; flex-shrink: 0; }
+  .risk-stat { text-align: center; }
+  .risk-stat .v { font-size: 22px; font-weight: 800; font-family: var(--mono); }
+  .risk-stat .l { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── Dimension results grid ── */
+  .dim-results-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
+  .dim-result-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+  }
+  .drc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .drc-name { font-size: 12px; font-weight: 700; }
+  .drc-pct { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+  .drc-bar-bg { height: 4px; background: var(--border); border-radius: 2px; }
+  .drc-bar    { height: 4px; border-radius: 2px; transition: width 1s ease; }
+  .drc-counts { display: flex; gap: 12px; margin-top: 8px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  /* ── Findings table ── */
+  .findings-section { margin-bottom: 20px; }
+  .findings-title { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .findings-count { background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 2px 10px; font-size: 10px; }
+  .finding-item {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 8px;
+    border-left: 3px solid;
+  }
+  .finding-item.critical { border-left-color: var(--red); }
+  .finding-item.high     { border-left-color: var(--amber); }
+  .finding-item.medium   { border-left-color: var(--accent); }
+  .fi-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .fi-id  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .fi-name { font-size: 12px; font-weight: 700; flex: 1; }
+  .sev-badge { font-family: var(--mono); font-size: 9px; padding: 2px 8px; border-radius: 100px; font-weight: 700; }
+  .sev-badge.critical { background: rgba(250,74,108,.15); color: var(--red); }
+  .sev-badge.high     { background: rgba(250,204,74,.15); color: var(--amber); }
+  .sev-badge.medium   { background: rgba(124,108,250,.15); color: var(--accent); }
+  .fi-dim { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+  .fi-resp { font-size: 11px; color: var(--muted); font-family: var(--mono); background: var(--bg); padding: 8px 10px; border-radius: 4px; }
+
+  /* ── Download button ── */
+  .download-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 15px; background: transparent;
+    border: 1.5px solid var(--green); border-radius: 10px;
+    color: var(--green); font-family: var(--sans); font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all .2s; text-decoration: none; margin-top: 20px;
+  }
+  .download-btn:hover { background: rgba(74,222,154,.08); }
+
+  /* ── Models tab ── */
+  .models-list { display: flex; flex-direction: column; gap: 8px; }
+  .model-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .model-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .model-name { font-family: var(--mono); font-size: 13px; font-weight: 700; flex: 1; }
+  .model-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .model-scan-btn {
+    padding: 6px 16px; background: transparent; border: 1px solid var(--accent);
+    border-radius: 6px; color: var(--accent); font-family: var(--mono); font-size: 11px;
+    cursor: pointer; transition: all .15s;
+  }
+  .model-scan-btn:hover { background: rgba(124,108,250,.1); }
+  .no-models { text-align: center; padding: 40px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  /* ── History tab ── */
+  .history-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s;
+  }
+  .history-item:hover { border-color: var(--border2); }
+  .hi-score { width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .hi-model { font-size: 13px; font-weight: 700; }
+  .hi-time  { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .hi-rating { font-family: var(--mono); font-size: 10px; padding: 3px 10px; border-radius: 100px; margin-left: auto; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 999;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px;
+    font-family: var(--mono); font-size: 12px;
+    transform: translateY(80px); opacity: 0; transition: all .3s;
+    max-width: 320px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border); padding: 24px 0;
+    margin-top: 64px; text-align: center;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="wrap header-inner">
+    <div class="logo">
+      <div class="logo-icon">SB</div>
+      <div>
+        <div class="logo-text">AI Security Sandbox</div>
+        <div class="logo-tag">MODEL VULNERABILITY TESTING</div>
+      </div>
+    </div>
+    <div>
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">checking...</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══ HERO ════════════════════════════════════════════════════════════════ -->
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-badge">8 SECURITY DIMENSIONS</div>
+    <h1>Test any AI model.<br><span>Find every weakness.</span></h1>
+    <p class="hero-sub">Upload a model or select an installed one. Our sandbox fires 100+ attacks across 8 dimensions and generates a compliance PDF report.</p>
+
+    <div class="dim-pills">
+      <span class="pill critical">Prompt Injection</span>
+      <span class="pill critical">Data Leakage</span>
+      <span class="pill critical">Agentic Scope</span>
+      <span class="pill high">Multi-turn Manipulation</span>
+      <span class="pill high">Tool Abuse</span>
+      <span class="pill high">Context Attacks</span>
+      <span class="pill medium">Behavioral Consistency</span>
+      <span class="pill medium">Output Exploits</span>
+    </div>
+  </div>
+
+  <!-- ══ MAIN CARD ══════════════════════════════════════════════════════════ -->
+  <div class="main-card">
+    <div class="card-tabs">
+      <div class="tab active" onclick="switchTab('scan')">New Scan</div>
+      <div class="tab" onclick="switchTab('models')">Installed Models</div>
+      <div class="tab" onclick="switchTab('history')">Scan History</div>
+    </div>
+
+    <!-- ── SCAN TAB ─────────────────────────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-scan">
+
+      <!-- Upload zone -->
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".gguf,.bin,.safetensors,.pt,.pth,.onnx">
+        <div class="upload-icon">⬆</div>
+        <div class="upload-title">Upload model file</div>
+        <div class="upload-sub">Drag and drop or click to browse</div>
+        <div class="upload-formats">SUPPORTED: .gguf · .bin · .safetensors · .pt · .onnx</div>
+      </div>
+
+      <div class="file-selected" id="fileSelected">
+        <div class="file-icon">📦</div>
+        <div>
+          <div class="file-name" id="fileName">—</div>
+          <div class="file-size" id="fileSize">—</div>
+        </div>
+        <div class="file-remove" onclick="clearFile()">✕</div>
+      </div>
+
+      <!-- OR divider -->
+      <div style="display:flex;align-items:center;gap:12px;margin:20px 0;">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">OR SELECT INSTALLED MODEL</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+
+      <!-- Model selector -->
+      <div class="field-group">
+        <label>INSTALLED MODEL</label>
+        <div class="select-wrap">
+          <select id="modelSelect">
+            <option value="">Loading installed models...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Config row -->
+      <div class="field-group">
+        <div class="field-row">
+          <div>
+            <label>OLLAMA HOST</label>
+            <input type="text" id="ollamaHost" value="http://localhost:11434">
+          </div>
+          <div>
+            <label>SCAN PROFILE</label>
+            <div class="select-wrap">
+              <select id="scanProfile" onchange="onProfileChange(this.value)">
+                <option value="all">Full scan (all 8 dimensions)</option>
+                <option value="quick">Quick scan (critical only)</option>
+                <option value="custom">Custom selection</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dimension selector (shown only for custom) -->
+      <div class="field-group" id="dimSelector" style="display:none;">
+        <label>SELECT DIMENSIONS</label>
+        <div class="dim-grid" id="dimGrid"></div>
+      </div>
+
+      <!-- LLM Judge toggle -->
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <h4>LLM Judge scoring</h4>
+          <p>Uses offline tinyllama model as judge — no API key needed</p>
+        </div>
+        <div class="toggle-switch on" id="judgeToggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+
+      <!-- Scan button -->
+      <button class="scan-btn" id="scanBtn" onclick="startScan()">
+        <span>⬡</span> Run Security Scan
+      </button>
+
+      <!-- Progress (shown during scan) -->
+      <div class="progress-panel" id="progressPanel">
+        <div style="height:1px;background:var(--border);margin:28px 0;"></div>
+        <div class="progress-header">
+          <div class="spinner"></div>
+          <div>
+            <div class="progress-title" id="progressTitle">Initialising scan...</div>
+          </div>
+        </div>
+        <!-- Progress bar -->
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressBar"></div>
+          </div>
+          <div class="progress-bar-meta">
+            <span class="progress-bar-sub" id="progressSub">Connecting to sandbox</span>
+            <span class="progress-bar-pct" id="progressPct">0%</span>
+          </div>
+        </div>
+        <div class="dim-progress-list" id="dimProgressList"></div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+
+      <!-- Results (shown after scan) -->
+      <div class="results-panel" id="resultsPanel">
+        <div style="height:1px;background:var(--border);margin:28px 0;"></div>
+
+        <div class="risk-banner" id="riskBanner">
+          <div class="risk-score-circle" id="riskCircle">
+            <span class="num" id="riskNum">—</span>
+            <span class="den">/100</span>
+          </div>
+          <div class="risk-info">
+            <h2 id="riskRating">—</h2>
+            <p id="riskDesc">—</p>
+          </div>
+          <div class="risk-stats">
+            <div class="risk-stat"><div class="v" id="rsCritical" style="color:var(--red)">0</div><div class="l">CRITICAL</div></div>
+            <div class="risk-stat"><div class="v" id="rsHigh" style="color:var(--amber)">0</div><div class="l">HIGH</div></div>
+            <div class="risk-stat"><div class="v" id="rsTotal">0</div><div class="l">TOTAL</div></div>
+            <div class="risk-stat"><div class="v" id="rsPass" style="color:var(--green)">0%</div><div class="l">PASS RATE</div></div>
+          </div>
+        </div>
+
+        <div class="dim-results-grid" id="dimResultsGrid"></div>
+
+        <div class="findings-section" id="findingsSection"></div>
+
+        <a class="download-btn" id="downloadBtn" href="#" target="_blank">
+          ⬇ Download HTML Report
+        </a>
+      </div>
+
+    </div>
+
+    <!-- ── MODELS TAB ────────────────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-models">
+      <div class="models-list" id="modelsList">
+        <div class="no-models">Loading installed models...</div>
+      </div>
+    </div>
+
+    <!-- ── HISTORY TAB ───────────────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-history">
+      <div id="historyList">
+        <div class="no-models">No scans yet. Run your first scan to see history.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ FOOTER ════════════════════════════════════════════════════════════ -->
+  <footer>
+    AI Security Sandbox · All model data stays local · Network isolated via Docker
+  </footer>
+</div>
+
+<!-- ══ TOAST ════════════════════════════════════════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AI Security Sandbox — UI
+// ═══════════════════════════════════════════════════════════════════════════
+const API = 'http://localhost:8000';
+
+const DIMENSIONS = [
+  { id:'adversarial', label:'Adversarial Inputs',  sev:'critical' },
+  { id:'pii',         label:'Data Leakage',        sev:'critical' },
+  { id:'agent',       label:'Agentic Scope',       sev:'critical' },
+  { id:'tool_abuse',  label:'Tool Abuse',          sev:'critical' },
+  { id:'multiturn',   label:'Multi-turn Manip.',   sev:'high'     },
+  { id:'context',     label:'Context Attacks',     sev:'high'     },
+  { id:'consistency', label:'Consistency',         sev:'high'     },
+  { id:'output',      label:'Output Exploits',     sev:'medium'   },
+];
+
+const QUICK_DIMS = ['adversarial','pii','agent','tool_abuse'];
+
+const DIM_KEY_MAP = {
+  adversarial: 'adversarial_inputs',
+  pii:         'data_leakage',
+  agent:       'agentic_autonomous',
+  tool_abuse:  'tool_function_abuse',
+  multiturn:   'multi_turn_manipulation',
+  context:     'context_window_attacks',
+  consistency: 'behavioral_consistency',
+  output:      'output_format_exploits',
+};
+
+const RISK_CONFIG = {
+  CRITICAL: { color:'var(--red)',    bg:'rgba(250,74,108,.08)',  border:'rgba(250,74,108,.3)',  desc:'CRITICAL — Do NOT deploy. Multiple critical vulnerabilities confirmed.' },
+  HIGH:     { color:'var(--amber)',  bg:'rgba(250,204,74,.08)',  border:'rgba(250,204,74,.3)', desc:'HIGH — Deployment not recommended. Remediate high-risk findings first.' },
+  MEDIUM:   { color:'var(--accent)', bg:'rgba(124,108,250,.08)', border:'rgba(124,108,250,.3)',desc:'MEDIUM — Review findings before production deployment.' },
+  LOW:      { color:'var(--green)',  bg:'rgba(74,222,154,.08)',  border:'rgba(74,222,154,.3)', desc:'LOW — Passed most tests. Minor findings require review.' },
+};
+
+// ── State ────────────────────────────────────────────────────────────────────
+let selectedFile  = null;
+let scanHistory   = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+let currentScanId = null;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildDimGrid();
+  checkHealth();
+  loadModels();
+  renderHistory();
+  setupDragDrop();
+  document.getElementById('fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+});
+
+// ── Health check ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      dot.className    = 'status-dot online';
+      text.textContent = `sandbox online · ${d.models_available.length} model(s) · judge: TinyLlama`;
+    } else {
+      dot.className    = 'status-dot';
+      text.textContent = 'ollama unreachable';
+    }
+  } catch {
+    dot.className    = 'status-dot';
+    text.textContent = 'sandbox offline';
+  }
+}
+
+// ── Load installed models ─────────────────────────────────────────────────────
+async function loadModels() {
+  try {
+    const r = await fetch(`${API}/models`);
+    const d = await r.json();
+    const models = (d.models || []).map(m => m.name || m);
+
+    const sel = document.getElementById('modelSelect');
+    sel.innerHTML = models.length
+      ? models.map(m => `<option value="${m}">${m}</option>`).join('')
+      : '<option value="">No models installed</option>';
+
+    const list = document.getElementById('modelsList');
+    if (!models.length) {
+      list.innerHTML = '<div class="no-models">No models installed. Run: docker exec sandbox_ollama ollama pull tinyllama</div>';
+      return;
+    }
+    const allMeta = d.models || [];
+    list.innerHTML = allMeta.map(m => `
+      <div class="model-item">
+        <div class="model-dot"></div>
+        <div class="model-name">${m.name}</div>
+        <div class="model-size">${m.size_gb ? m.size_gb + ' GB' : ''} ${m.params || ''}</div>
+        <button class="model-scan-btn" onclick="quickScan('${m.name}')">Scan →</button>
+      </div>`).join('');
+  } catch {
+    document.getElementById('modelSelect').innerHTML = '<option value="">Cannot reach sandbox</option>';
+    document.getElementById('modelsList').innerHTML  = '<div class="no-models">Sandbox offline. Start with: docker compose up</div>';
+  }
+}
+
+function quickScan(modelName) {
+  switchTab('scan');
+  document.getElementById('modelSelect').value = modelName;
+  setTimeout(() => startScan(), 100);
+}
+
+// ── Drag & drop ──────────────────────────────────────────────────────────────
+function setupDragDrop() {
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+}
+
+function handleFile(file) {
+  selectedFile = file;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = formatBytes(file.size);
+  document.getElementById('fileSelected').classList.add('show');
+  document.getElementById('uploadZone').style.opacity = '0.5';
+}
+
+function clearFile() {
+  selectedFile = null;
+  document.getElementById('fileSelected').classList.remove('show');
+  document.getElementById('uploadZone').style.opacity = '1';
+  document.getElementById('fileInput').value = '';
+}
+
+function formatBytes(b) {
+  if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+  return (b/1e3).toFixed(0) + ' KB';
+}
+
+function onProfileChange(val) {
+  document.getElementById('dimSelector').style.display = val === 'custom' ? 'block' : 'none';
+}
+
+function buildDimGrid() {
+  const grid = document.getElementById('dimGrid');
+  grid.innerHTML = DIMENSIONS.map(d => `
+    <label class="dim-check checked" id="chk-${d.id}">
+      <input type="checkbox" checked value="${d.id}">
+      <div class="check-box">✓</div>
+      <span class="check-label">${d.label}</span>
+      <span class="check-sev sev-${d.sev[0]}">${d.sev.toUpperCase()}</span>
+    </label>`).join('');
+  grid.querySelectorAll('.dim-check').forEach(el => {
+    el.addEventListener('click', () => {
+      const cb = el.querySelector('input');
+      cb.checked = !cb.checked;
+      el.classList.toggle('checked', cb.checked);
+      el.querySelector('.check-box').textContent = cb.checked ? '✓' : '';
+    });
+  });
+}
+
+function getSelectedDims() {
+  const profile = document.getElementById('scanProfile').value;
+  if (profile === 'all')   return ['all'];
+  if (profile === 'quick') return QUICK_DIMS;
+  return [...document.querySelectorAll('#dimGrid input:checked')].map(i => i.value);
+}
+
+// ── Upload with SSE streaming ─────────────────────────────────────────────────
+async function uploadFileWithSSE(file) {
+  const form = new FormData();
+  form.append('file', file);
+
+  const resp = await fetch(`${API}/upload`, { method: 'POST', body: form });
+  if (!resp.ok) throw new Error(`Upload HTTP ${resp.status}`);
+
+  const reader  = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let   buffer  = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();   // keep incomplete line
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      let evt;
+      try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+      if (evt.phase === 'error') throw new Error(evt.error || 'Upload error');
+
+      if (evt.phase === 'saving') {
+        const pct = evt.pct >= 0 ? evt.pct + '%' : formatBytes(evt.saved_bytes);
+        updateProgress('Saving model file...', `${formatBytes(evt.saved_bytes)} written`);
+        addLog(`SAVE  ${formatBytes(evt.saved_bytes)}`, 'info');
+        setProgressBar(10);
+      }
+      if (evt.phase === 'saving_done') {
+        addLog(`SAVE  complete — ${formatBytes(evt.saved_bytes)}`, 'ok');
+        setProgressBar(30);
+      }
+      if (evt.phase === 'registering') {
+        const pct = evt.pct >= 0 ? ` ${evt.pct}%` : '';
+        updateProgress('Registering with Ollama...', evt.status + pct);
+        addLog(`REG   ${evt.status}${pct}`, 'info');
+        if (evt.pct >= 0) setProgressBar(30 + Math.round(evt.pct * 0.6));
+      }
+      if (evt.phase === 'ready') {
+        addLog(`REG   ready — model_name="${evt.model_name}"`, 'ok');
+        setProgressBar(100);
+        return evt.model_name;
+      }
+    }
+  }
+  throw new Error('Upload stream ended without ready event');
+}
+
+// ── Start scan ────────────────────────────────────────────────────────────────
+async function startScan() {
+  const judgeOn = document.getElementById('judgeToggle').classList.contains('on');
+  const dims    = getSelectedDims();
+  let modelName = selectedFile ? null : document.getElementById('modelSelect').value;
+
+  if (!modelName && !selectedFile) { toast('Select or upload a model first.'); return; }
+
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('progressPanel').classList.add('show');
+  document.getElementById('resultsPanel').classList.remove('show');
+  document.getElementById('logBox').innerHTML = '';
+  updateProgress('Initializing...', '');
+  setProgressBar(0);
+
+  scrollTo({ top: document.getElementById('progressPanel').offsetTop - 120, behavior: 'smooth' });
+
+  // ── Upload phase ───────────────────────────────────────────────────────────
+  if (selectedFile) {
+    addLog(`UPLOAD ${selectedFile.name} (${formatBytes(selectedFile.size)})`, 'info');
+    updateProgress('Uploading model...', 'Streaming to Ollama');
+    setProgressBar(2);
+    try {
+      modelName = await uploadFileWithSSE(selectedFile);
+      addLog(`READY  model="${modelName}"`, 'ok');
+      await loadModels();
+    } catch(e) {
+      addLog(`ERROR  ${e.message}`, 'err');
+      updateProgress('Upload failed', e.message);
+      document.getElementById('scanBtn').disabled = false;
+      return;
+    }
+  }
+
+  // ── Build dimension list UI ────────────────────────────────────────────────
+  const activeDims = dims[0] === 'all' ? DIMENSIONS : DIMENSIONS.filter(d => dims.includes(d.id));
+  const list = document.getElementById('dimProgressList');
+  list.innerHTML = activeDims.map(d => `
+    <div class="dim-progress-item" id="dp-${d.id}">
+      <div class="dp-status waiting" id="dp-status-${d.id}">○</div>
+      <div class="dp-name">${d.label}</div>
+      <div class="dp-result" id="dp-result-${d.id}">queued</div>
+    </div>`).join('');
+
+  // ── POST /scan ─────────────────────────────────────────────────────────────
+  addLog(`SCAN  model="${modelName}" dims=${dims[0]==='all'?'all':dims.join(',')}`, 'info');
+  addLog(`JUDGE tinyllama (offline)  concurrency=6`, 'info');
+  updateProgress('Queuing scan...', `Model: ${modelName}`);
+  setProgressBar(3);
+
+  let scanId;
+  try {
+    const resp = await fetch(`${API}/scan`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ model_name: modelName, dimensions: dims, judge_enabled: judgeOn })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    scanId = data.scan_id;
+    currentScanId = scanId;
+    addLog(`SCAN  id=${scanId.slice(0,8)}… status=queued`, 'ok');
+  } catch(e) {
+    addLog(`ERROR  ${e.message}`, 'err');
+    updateProgress('Failed to start scan', e.message);
+    document.getElementById('scanBtn').disabled = false;
+    return;
+  }
+
+  // ── Set dims to "running" then poll ───────────────────────────────────────
+  activeDims.forEach(d => setDimStatus(d.id, 'running'));
+  await pollScan(scanId, activeDims);
+}
+
+// ── Poll scan/{id}/status ─────────────────────────────────────────────────────
+async function pollScan(scanId, activeDims) {
+  const POLL_MS   = 1500;
+  let   lastLogLen = 0;
+
+  while (true) {
+    await sleep(POLL_MS);
+
+    let st;
+    try {
+      const r = await fetch(`${API}/scan/${scanId}/status`);
+      if (!r.ok) { addLog(`POLL  HTTP ${r.status}`, 'err'); continue; }
+      st = await r.json();
+    } catch(e) {
+      addLog(`POLL  ${e.message}`, 'err');
+      continue;
+    }
+
+    // ── Progress bar ────────────────────────────────────────────────────────
+    const pct = st.progress_pct || 0;
+    setProgressBar(3 + Math.round(pct * 0.95));
+    updateProgress(
+      pct < 100 ? `Scanning… ${pct}%` : 'Scan complete ✓',
+      `${st.done_dims || 0} / ${st.total_dims || activeDims.length} dimensions`
+    );
+
+    // ── Prompt log from server ───────────────────────────────────────────────
+    const srvLog = st.log || [];
+    for (let i = lastLogLen; i < srvLog.length; i++) {
+      addLog(srvLog[i], 'prompt');
+    }
+    lastLogLen = srvLog.length;
+
+    // ── Scan done ────────────────────────────────────────────────────────────
+    if (st.status === 'done' && st.result) {
+      const result = st.result;
+      activeDims.forEach(d => {
+        const dd = findDimData(result.dimensions, d.id);
+        if (dd && !dd.error) {
+          const pr = dd.pass_rate ?? 0;
+          setDimStatus(d.id, 'done', `${pr}%`);
+          addLog(`DONE  ${d.label}: ${dd.passed}/${dd.total} passed (${pr}%)`, pr >= 80 ? 'ok' : 'err');
+        } else if (dd?.error) {
+          setDimStatus(d.id, 'failed', 'error');
+          addLog(`ERR   ${d.label}: ${dd.error}`, 'err');
+        } else {
+          setDimStatus(d.id, 'done', '—');
+        }
+      });
+      setProgressBar(100);
+      const score = result.risk_score?.score ?? '?';
+      updateProgress('Scan complete ✓', `Risk score: ${score}/100 · ${result.risk_score?.rating || '?'}`);
+      addLog(`DONE  scan=${scanId.slice(0,8)}… score=${score}/100 rating=${result.risk_score?.rating}`, 'ok');
+
+      saveHistory({
+        scan_id:   result.scan_id,
+        model:     result.model,
+        score:     result.risk_score?.score ?? 0,
+        rating:    result.risk_score?.rating ?? '—',
+        timestamp: result.timestamp
+      });
+
+      setTimeout(() => showResults(result), 800);
+      break;
+    }
+
+    if (st.status === 'error') {
+      addLog('ERROR  server-side scan failure', 'err');
+      activeDims.forEach(d => setDimStatus(d.id, 'failed', 'error'));
+      updateProgress('Scan failed', 'Server-side error');
+      break;
+    }
+  }
+  document.getElementById('scanBtn').disabled = false;
+}
+
+// ── Progress helpers ──────────────────────────────────────────────────────────
+function setProgressBar(pct) {
+  const fill  = document.getElementById('progressBar');
+  const label = document.getElementById('progressPct');
+  const v     = Math.max(0, Math.min(100, pct));
+  if (fill)  fill.style.width   = v + '%';
+  if (label) label.textContent  = v + '%';
+}
+
+function updateProgress(title, sub) {
+  const t = document.getElementById('progressTitle');
+  const s = document.getElementById('progressSub');
+  if (t) t.textContent = title;
+  if (s) s.textContent = sub;
+}
+
+function setDimStatus(id, state, result) {
+  const el  = document.getElementById(`dp-status-${id}`);
+  const res = document.getElementById(`dp-result-${id}`);
+  if (!el) return;
+  el.className = `dp-status ${state}`;
+  el.innerHTML = state === 'running' ? '<div class="dp-spin"></div>'
+               : state === 'done'    ? '✓'
+               : state === 'failed'  ? '✗'
+               : '○';
+  if (result !== undefined && res) res.textContent = result;
+}
+
+function addLog(msg, type) {
+  const box  = document.getElementById('logBox');
+  const line = document.createElement('div');
+  const ts   = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  line.className   = `log-line ${type || ''}`;
+  line.textContent = `${ts}  ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  // Keep log to 200 entries max
+  while (box.children.length > 200) box.removeChild(box.firstChild);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Show results ──────────────────────────────────────────────────────────────
+function showResults(data) {
+  document.getElementById('progressPanel').classList.remove('show');
+  document.getElementById('resultsPanel').classList.add('show');
+
+  const risk = data.risk_score || {};
+  const cfg  = RISK_CONFIG[risk.rating] || RISK_CONFIG.MEDIUM;
+
+  // Risk banner
+  const banner = document.getElementById('riskBanner');
+  banner.style.background  = cfg.bg;
+  banner.style.borderColor = cfg.border;
+  banner.style.color       = cfg.color;
+  document.getElementById('riskNum').textContent    = risk.score ?? '?';
+  document.getElementById('riskRating').textContent = cfg.desc;
+  document.getElementById('riskDesc').textContent   =
+    `${risk.total_passed ?? 0} tests passed · ${risk.total_failed ?? 0} failed · ${risk.critical_fails ?? 0} critical`;
+  document.getElementById('rsCritical').textContent = risk.critical_fails ?? 0;
+  document.getElementById('rsHigh').textContent     = risk.high_fails ?? 0;
+  document.getElementById('rsTotal').textContent    = risk.total_failed ?? 0;
+  document.getElementById('rsPass').textContent     = (risk.overall_pass_rate ?? 0) + '%';
+
+  // Dimension grid
+  const dimGrid = document.getElementById('dimResultsGrid');
+  dimGrid.innerHTML = '';
+  Object.entries(data.dimensions || {}).forEach(([key, dim]) => {
+    if (dim.error) {
+      dimGrid.innerHTML += `
+        <div class="dim-result-card">
+          <div class="drc-top">
+            <div class="drc-name">${(dim.dimension||key).replace(/_/g,' ')}</div>
+            <div class="drc-pct" style="color:var(--red)">ERR</div>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--red);margin-top:6px">${dim.error.slice(0,60)}</div>
+        </div>`;
+      return;
+    }
+    const pr    = dim.pass_rate ?? 0;
+    const color = pr >= 90 ? 'var(--green)' : pr >= 70 ? 'var(--amber)' : 'var(--red)';
+    const name  = (dim.dimension || key).replace(/_/g, ' ').toUpperCase();
+    dimGrid.innerHTML += `
+      <div class="dim-result-card">
+        <div class="drc-top">
+          <div class="drc-name">${name}</div>
+          <div class="drc-pct" style="color:${color}">${pr}%</div>
+        </div>
+        <div class="drc-bar-bg"><div class="drc-bar" style="width:${pr}%;background:${color}"></div></div>
+        <div class="drc-counts">
+          <span style="color:var(--green)">✓ ${dim.passed ?? 0}</span>
+          <span style="color:var(--red)">✗ ${dim.failed ?? 0}</span>
+          <span>/ ${dim.total ?? 0}</span>
+        </div>
+      </div>`;
+  });
+
+  // Findings — structured like a security scanner
+  const allFindings = collectFindings(data.dimensions);
+  const sec = document.getElementById('findingsSection');
+  if (!allFindings.length) {
+    sec.innerHTML = `<div style="font-family:var(--mono);font-size:12px;color:var(--green);
+      padding:20px;border:1px solid var(--border);border-radius:8px;text-align:center">
+      ✓ NO FAILURES — all ${risk.total_tests ?? 0} probes passed</div>`;
+  } else {
+    const bySev = { critical: [], high: [], medium: [], low: [] };
+    allFindings.forEach(f => (bySev[f.severity] || bySev.medium).push(f));
+    let html = '';
+    for (const [sev, items] of Object.entries(bySev)) {
+      if (!items.length) continue;
+      html += renderFindingsTable(sev.toUpperCase(), items, sev);
+    }
+    sec.innerHTML = html;
+  }
+
+  // Download button
+  setupDownloadBtn(currentScanId);
+
+  scrollTo({ top: document.getElementById('resultsPanel').offsetTop - 100, behavior: 'smooth' });
+}
+
+function collectFindings(dims) {
+  const out = [];
+  Object.entries(dims || {}).forEach(([key, dim]) => {
+    if (dim.error) return;
+    const items = [...(dim.tests||[]), ...(dim.scenarios||[]), ...(dim.groups||[])];
+    items.forEach(item => {
+      if (!item.passed) {
+        out.push({
+          dimension: (dim.dimension || key).replace(/_/g,' ').toUpperCase(),
+          id:        item.id || '—',
+          category:  item.category || item.name || item.intent || '—',
+          severity:  item.severity || 'medium',
+          payload:   item.payload   || '',
+          response:  item.response  || '',
+          reason:    item.judge_reason || item.reason || '—',
+        });
+      }
+    });
+  });
+  out.sort((a,b) => ['critical','high','medium','low'].indexOf(a.severity)
+                  - ['critical','high','medium','low'].indexOf(b.severity));
+  return out;
+}
+
+function renderFindingsTable(title, findings, sev) {
+  const COLORS = {
+    critical: 'var(--red)', high: 'var(--amber)', medium: 'var(--accent)', low: 'var(--muted)'
+  };
+  const col = COLORS[sev] || 'var(--muted)';
+  const rows = findings.slice(0, 10).map(f => `
+    <div class="finding-item ${f.severity}">
+      <div class="fi-top">
+        <span class="fi-id">${f.id}</span>
+        <span class="fi-name">${f.category}</span>
+        <span class="sev-badge ${f.severity}">${f.severity.toUpperCase()}</span>
+      </div>
+      <div class="fi-dim">DIM: ${f.dimension} &nbsp;·&nbsp; JUDGE: ${escHtml(f.reason)}</div>
+      ${f.response ? `<div class="fi-resp">&gt; ${escHtml(f.response.slice(0,160))}${f.response.length>160?'…':''}</div>` : ''}
+    </div>`).join('');
+  return `
+    <div class="findings-title" style="color:${col}">
+      ${title}
+      <span class="findings-count">${findings.length}</span>
+      ${findings.length > 10 ? `<span style="font-size:10px;color:var(--muted)">(showing 10 of ${findings.length})</span>` : ''}
+    </div>
+    ${rows}`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function findDimData(dims, shortId) {
+  const longKey = DIM_KEY_MAP[shortId];
+  return dims?.[shortId] || dims?.[longKey]
+      || Object.values(dims || {}).find(v => v?.dimension === longKey);
+}
+
+// ── Download report ───────────────────────────────────────────────────────────
+function setupDownloadBtn(scanId) {
+  const btn = document.getElementById('downloadBtn');
+  if (!btn || !scanId) return;
+  btn.onclick = async (e) => {
+    e.preventDefault();
+    const orig = btn.innerHTML;
+    btn.innerHTML = '⏳ Preparing report...';
+    btn.style.pointerEvents = 'none';
+    try {
+      const r = await fetch(`${API}/report/${scanId}`);
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        try { const j = await r.json(); msg = j.error || msg; } catch {}
+        toast(`Report error: ${msg}`);
+        btn.innerHTML = orig;
+        btn.style.pointerEvents = '';
+        return;
+      }
+      const html = await r.text();
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `security_report_${scanId.slice(0,8)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      toast('Report downloaded ✓');
+    } catch(err) {
+      toast(`Download failed: ${err.message}`);
+    } finally {
+      btn.innerHTML = orig;
+      btn.style.pointerEvents = '';
+    }
+  };
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function saveHistory(entry) {
+  scanHistory.unshift(entry);
+  if (scanHistory.length > 20) scanHistory = scanHistory.slice(0, 20);
+  localStorage.setItem('scanHistory', JSON.stringify(scanHistory));
+  renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!scanHistory.length) {
+    el.innerHTML = '<div class="no-models">No scans yet.</div>';
+    return;
+  }
+  el.innerHTML = scanHistory.map(s => {
+    const cfg  = RISK_CONFIG[s.rating] || RISK_CONFIG.MEDIUM;
+    const date = new Date(s.timestamp).toLocaleString();
+    return `
+      <div class="history-item" onclick="downloadHistoryReport('${s.scan_id}')">
+        <div class="hi-score" style="background:${cfg.bg};color:${cfg.color}">${s.score}</div>
+        <div>
+          <div class="hi-model">${s.model}</div>
+          <div class="hi-time">${date}</div>
+        </div>
+        <div class="hi-rating" style="background:${cfg.bg};color:${cfg.color}">${s.rating}</div>
+      </div>`;
+  }).join('');
+}
+
+async function downloadHistoryReport(scanId) {
+  try {
+    const r = await fetch(`${API}/report/${scanId}`);
+    if (!r.ok) { toast('Report not found for this scan.'); return; }
+    const html = await r.text();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `security_report_${scanId.slice(0,8)}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch(e) { toast('Download failed: ' + e.message); }
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['scan','models','history'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'models')  loadModels();
+  if (name === 'history') renderHistory();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>

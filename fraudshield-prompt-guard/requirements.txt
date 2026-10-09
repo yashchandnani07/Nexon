@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+yara-python
+transformers>=4.38.0
+torch
+accelerate
+huggingface_hub
+ollama
+python-multipart
+sentencepiece

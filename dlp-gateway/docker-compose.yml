@@ -1,0 +1,94 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dlp
+      POSTGRES_PASSWORD: dlp
+      POSTGRES_DB: dlp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dlp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── MailHog — Local SMTP + Email Web UI ────────────────────────────────────
+  # Replaces SendGrid; fully offline. Inbox at: http://localhost:8025
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"    # SMTP port (gateway sends emails here)
+      - "8025:8025"    # Web UI to view all alert emails
+    restart: unless-stopped
+
+  # ── FastAPI DLP Gateway ─────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      POSTGRES_URL: postgresql+asyncpg://dlp:dlp@postgres:5432/dlp
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    volumes:
+      - .:/app
+      - ./models:/app/models   # Pre-downloaded GLiNER model
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── React Dashboard Builder ─────────────────────────────────────────────────
+  dashboard-builder:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    volumes:
+      - ./ui:/app/dist
+    restart: "no"
+
+  # ── Nginx — Serves React + proxies API to gateway ─────────────────────────
+  dashboard:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - gateway
+      - dashboard-builder
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

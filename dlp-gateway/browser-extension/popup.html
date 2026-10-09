@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AegisAI DLP Guardian</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 360px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF;
+    color: #0F172A;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, #0EA5E9 0%, #0369A1 100%);
+    padding: 16px 18px 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -18px; right: -18px;
+    width: 80px; height: 80px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -24px; right: 36px;
+    width: 60px; height: 60px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+  }
+  .logo {
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    display: grid; place-items: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    backdrop-filter: blur(4px);
+    position: relative; z-index: 1;
+  }
+  .brand-wrap { position: relative; z-index: 1; }
+  .brand { font-size: 14px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+  .brand-sub { font-size: 10px; color: rgba(255,255,255,0.72); font-weight: 500; margin-top: 2px; letter-spacing: 0.02em; }
+
+  .header-badge {
+    margin-left: auto;
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Status bar ── */
+  .status-bar {
+    margin: 10px 12px 0;
+    padding: 9px 13px;
+    background: #F0FDF4;
+    border: 1px solid #A7F3D0;
+    border-radius: 10px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11.5px; color: #065F46; font-weight: 600;
+    box-shadow: 0 1px 3px rgba(16,185,129,0.08);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 0 0 rgba(16,185,129,0.4);
+    animation: pulse-green 2s infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse-green {
+    0%   { box-shadow: 0 0 0 0   rgba(16,185,129,0.5); }
+    70%  { box-shadow: 0 0 0 6px rgba(16,185,129,0);   }
+    100% { box-shadow: 0 0 0 0   rgba(16,185,129,0);   }
+  }
+  .status-bar span { margin-left: auto; font-size: 10px; color: #6EE7B7; font-weight: 700; }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px; padding: 10px 12px 0;
+  }
+  .stat-card {
+    background: #fff;
+    border: 1px solid #E0F2FE;
+    border-radius: 12px;
+    padding: 10px 8px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(14,165,233,0.07);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .stat-card:hover { border-color: #CBD5E1; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .stat-value { font-size: 20px; font-weight: 800; color: #0EA5E9; line-height: 1; }
+  .stat-value.green { color: #10B981; }
+  .stat-label { font-size: 9px; color: #94A3B8; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* ── Coverage section ── */
+  .section { padding: 10px 12px 0; }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-size: 10px; font-weight: 700;
+    color: #64748B; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .section-badge {
+    font-size: 9px; font-weight: 700; color: #0284C7;
+    background: #E0F2FE; border: 1px solid #BAE6FD;
+    padding: 2px 8px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+
+  /* ── Universal coverage card ── */
+  .coverage-card {
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(14,165,233,0.07);
+  }
+  .coverage-title {
+    font-size: 12px; font-weight: 700; color: #0284C7; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .coverage-icon { font-size: 14px; }
+  .coverage-desc {
+    font-size: 11px; color: #475569; line-height: 1.6;
+  }
+  .platform-pills {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;
+  }
+  .platform-pill {
+    font-size: 10px; font-weight: 600; color: #0284C7;
+    background: #F0F9FF; border: 1px solid #BAE6FD;
+    padding: 3px 9px; border-radius: 20px;
+  }
+  .platform-pill.more {
+    color: #64748B; background: #F8FAFC; border-color: #E2E8F0;
+  }
+
+  /* ── Detection layers ── */
+  .layers-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .layer-item {
+    display: flex; align-items: center; gap: 7px;
+    background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 8px; padding: 7px 10px;
+    font-size: 11px; font-weight: 600; color: #374151;
+    transition: border-color 0.15s;
+  }
+  .layer-item:hover { border-color: #7DD3FC; }
+  .layer-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot-sky    { background: #0EA5E9; }
+  .dot-violet { background: #8B5CF6; }
+  .dot-amber  { background: #F59E0B; }
+  .dot-rose   { background: #F43F5E; }
+  .dot-green  { background: #10B981; }
+  .dot-indigo { background: #6366F1; }
+
+  /* ── Info box ── */
+  .info-box {
+    margin: 10px 12px 0;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-size: 11.5px; color: #0369A1; line-height: 1.65;
+  }
+  .info-box strong { color: #0369A1; }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-top: 1px solid #E2E8F0;
+    font-size: 10px; color: #94A3B8;
+    text-align: center;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  footer a {
+    color: #0EA5E9; text-decoration: none; font-weight: 700;
+    transition: color 0.15s;
+  }
+  footer a:hover { color: #0284C7; text-decoration: underline; }
+  .footer-dot { width: 3px; height: 3px; border-radius: 50%; background: #CBD5E1; }
+
+  /* ── Admin Lock section ── */
+  .lock-card {
+    margin: 10px 12px 0;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    background: #fff;
+    overflow: hidden;
+  }
+  .lock-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 13px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .lock-header-left {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; font-weight: 700; color: #374151;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .lock-status-pill {
+    font-size: 9px; font-weight: 700; padding: 2px 8px;
+    border-radius: 20px; letter-spacing: 0.04em;
+  }
+  .pill-locked   { background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; }
+  .pill-unlocked { background:#F0FDF4; color:#15803D; border:1px solid #A7F3D0; }
+  .lock-chevron  { font-size:11px; color:#94A3B8; transition: transform 0.2s; }
+  .lock-chevron.open { transform: rotate(180deg); }
+
+  .lock-body { padding: 12px 13px; display: none; flex-direction: column; gap: 10px; }
+  .lock-body.open { display: flex; }
+
+  .lock-info-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: #64748B;
+    border-bottom: 1px solid #F1F5F9; padding-bottom: 8px;
+  }
+  .lock-info-row:last-of-type { border-bottom: none; padding-bottom: 0; }
+  .lock-info-row strong { color: #0F172A; font-weight: 700; }
+
+  .lock-input {
+    width: 100%; padding: 8px 11px;
+    border: 1px solid #E2E8F0; border-radius: 8px;
+    font-size: 13px; font-family: inherit;
+    outline: none; transition: border-color 0.15s;
+    color: #0F172A; background: #F8FAFC;
+    letter-spacing: 0.2em; text-align: center;
+  }
+  .lock-input:focus { border-color: #0EA5E9; background: #fff; }
+  .lock-input::placeholder { letter-spacing: 0; color: #CBD5E1; }
+
+  .lock-btn {
+    width: 100%; padding: 9px 0;
+    border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .lock-btn-primary {
+    background: #0EA5E9; color: #fff;
+  }
+  .lock-btn-primary:hover { background: #0284C7; }
+  .lock-btn-danger {
+    background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA;
+  }
+  .lock-btn-danger:hover { background: #FEE2E2; }
+  .lock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .lock-msg {
+    font-size: 10.5px; text-align: center;
+    border-radius: 6px; padding: 5px 8px;
+    display: none;
+  }
+  .lock-msg.error   { display:block; background:#FEF2F2; color:#DC2626; }
+  .lock-msg.success { display:block; background:#F0FDF4; color:#15803D; }
+  .lock-msg.info    { display:block; background:#F0F9FF; color:#0369A1; }
+
+  .lock-set-label {
+    font-size: 9.5px; font-weight: 700; color: #94A3B8;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🛡</div>
+  <div class="brand-wrap">
+    <div class="brand">AegisAI DLP Guardian</div>
+    <div class="brand-sub">Universal prompt protection</div>
+  </div>
+  <div class="header-badge">v4.0</div>
+</header>
+
+<div class="status-bar">
+  <div class="status-dot"></div>
+  Active — Monitoring all AI platforms
+  <span>LIVE</span>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-platforms">10+</div>
+    <div class="stat-label">Platforms</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-layers">10</div>
+    <div class="stat-label">DLP Layers</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value green">ON</div>
+    <div class="stat-label">Guard Status</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Coverage</div>
+    <div class="section-badge">Universal Mode</div>
+  </div>
+  <div class="coverage-card">
+    <div class="coverage-title">
+      <span class="coverage-icon">🌐</span>
+      Dynamic Platform Detection
+    </div>
+    <div class="coverage-desc">
+      Guardian operates across <strong>all supported AI platforms</strong> — not limited to a fixed list.
+      Prompts are intercepted, scanned, and classified in real-time regardless of destination.
+    </div>
+    <div class="platform-pills">
+      <span class="platform-pill">ChatGPT</span>
+      <span class="platform-pill">Gemini</span>
+      <span class="platform-pill">Claude</span>
+      <span class="platform-pill">DeepSeek</span>
+      <span class="platform-pill">Copilot</span>
+      <span class="platform-pill">Grok</span>
+      <span class="platform-pill more">+ more →</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Detection Layers</div>
+  </div>
+  <div class="layers-grid">
+    <div class="layer-item"><span class="layer-dot dot-rose"></span>Credentials</div>
+    <div class="layer-item"><span class="layer-dot dot-sky"></span>PII / NER</div>
+    <div class="layer-item"><span class="layer-dot dot-amber"></span>Financial Data</div>
+    <div class="layer-item"><span class="layer-dot dot-violet"></span>Prompt Injection</div>
+    <div class="layer-item"><span class="layer-dot dot-green"></span>Classification</div>
+    <div class="layer-item"><span class="layer-dot dot-indigo"></span>LLM Semantics</div>
+  </div>
+</div>
+
+<!-- ── Admin Lock Section ── -->
+<div class="lock-card" id="lock-card">
+  <div class="lock-header" id="lock-toggle">
+    <div class="lock-header-left">
+      <span id="lock-icon">🔓</span> Admin Lock
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="lock-status-pill pill-unlocked" id="lock-pill">UNLOCKED</span>
+      <span class="lock-chevron" id="lock-chevron">▼</span>
+    </div>
+  </div>
+  <div class="lock-body" id="lock-body">
+
+    <!-- Unlocked state: show set-PIN form -->
+    <div id="panel-set-lock">
+      <div class="lock-set-label">Set Admin PIN (4-6 digits)</div>
+      <input class="lock-input" type="password" id="inp-new-pin"
+        placeholder="Enter PIN" maxlength="6" inputmode="numeric"/>
+      <input class="lock-input" type="password" id="inp-confirm-pin"
+        placeholder="Confirm PIN" maxlength="6" inputmode="numeric" style="margin-top:6px"/>
+      <div class="lock-msg" id="msg-set"></div>
+      <button class="lock-btn lock-btn-primary" id="btn-set-lock">🔒 Enable Admin Lock</button>
+      <div style="font-size:10px;color:#94A3B8;text-align:center;line-height:1.5">
+        Once locked, employees cannot disable or remove this extension without the PIN.
+      </div>
+    </div>
+
+    <!-- Locked state: verify PIN to manage -->
+    <div id="panel-locked" style="display:none">
+      <div class="lock-info-row"><span>Locked by</span><strong id="lock-set-by">—</strong></div>
+      <div class="lock-info-row"><span>Locked at</span><strong id="lock-set-at">—</strong></div>
+      <div class="lock-info-row"><span>Unauthorised attempts</span><strong id="tamper-count" style="color:#DC2626">0</strong></div>
+      <div class="lock-set-label" style="margin-top:4px">Admin PIN to Remove Lock</div>
+      <input class="lock-input" type="password" id="inp-unlock-pin"
+        placeholder="Enter admin PIN" maxlength="6" inputmode="numeric"/>
+      <div class="lock-msg" id="msg-unlock"></div>
+      <button class="lock-btn lock-btn-danger" id="btn-remove-lock">🔓 Remove Lock</button>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <a href="http://localhost:80" target="_blank">Open Dashboard →</a>
+  <div class="footer-dot"></div>
+  <span>AegisAI Security</span>
+</footer>
+
+<script>
+// ── Admin Lock popup logic ──────────────────────────────────────────────────────
+const toggle  = document.getElementById('lock-toggle');
+const body    = document.getElementById('lock-body');
+const chevron = document.getElementById('lock-chevron');
+const pill    = document.getElementById('lock-pill');
+const icon    = document.getElementById('lock-icon');
+const panelSet    = document.getElementById('panel-set-lock');
+const panelLocked = document.getElementById('panel-locked');
+
+// Toggle drawer
+toggle.addEventListener('click', () => {
+  body.classList.toggle('open');
+  chevron.classList.toggle('open');
+});
+
+function setMsg(id, type, text) {
+  const el = document.getElementById(id);
+  el.className = 'lock-msg ' + type;
+  el.textContent = text;
+}
+
+// Load current lock state
+chrome.runtime.sendMessage({ type: 'GET_LOCK_STATUS' }, (data) => {
+  if (!data) return;
+  if (data.dlp_lock_enabled) {
+    showLockedState(data);
+  } else {
+    showUnlockedState();
+  }
+});
+
+function showLockedState(data) {
+  icon.textContent = '🔒';
+  pill.textContent = 'LOCKED';
+  pill.className   = 'lock-status-pill pill-locked';
+  panelSet.style.display    = 'none';
+  panelLocked.style.display = 'block';
+  document.getElementById('lock-set-by').textContent = data.dlp_lock_set_by || 'admin';
+  const t = data.dlp_lock_set_at ? new Date(data.dlp_lock_set_at).toLocaleString() : '—';
+  document.getElementById('lock-set-at').textContent = t;
+  document.getElementById('tamper-count').textContent = data.dlp_tamper_count || 0;
+}
+
+function showUnlockedState() {
+  icon.textContent = '🔓';
+  pill.textContent = 'UNLOCKED';
+  pill.className   = 'lock-status-pill pill-unlocked';
+  panelSet.style.display    = 'block';
+  panelLocked.style.display = 'none';
+}
+
+// Set PIN
+document.getElementById('btn-set-lock').addEventListener('click', async () => {
+  const pin     = document.getElementById('inp-new-pin').value.trim();
+  const confirm = document.getElementById('inp-confirm-pin').value.trim();
+  if (!/^\d{4,6}$/.test(pin))     return setMsg('msg-set', 'error', 'PIN must be 4–6 digits.');
+  if (pin !== confirm)             return setMsg('msg-set', 'error', 'PINs do not match.');
+  document.getElementById('btn-set-lock').disabled = true;
+  chrome.runtime.sendMessage({ type: 'ADMIN_SET_PIN', pin, adminId: 'admin' }, (r) => {
+    if (r && r.ok) {
+      setMsg('msg-set', 'success', '✔ Lock enabled. Employees cannot remove this extension.');
+      setTimeout(() => chrome.runtime.sendMessage({ type: 'GET_LOCK_STATUS' }, showLockedState), 800);
+    } else {
+      setMsg('msg-set', 'error', 'Failed to set lock. Try again.');
+      document.getElementById('btn-set-lock').disabled = false;
+    }
+  });
+});
+
+// Remove lock
+document.getElementById('btn-remove-lock').addEventListener('click', () => {
+  const pin = document.getElementById('inp-unlock-pin').value.trim();
+  if (!pin) return setMsg('msg-unlock', 'error', 'Enter your admin PIN.');
+  document.getElementById('btn-remove-lock').disabled = true;
+  chrome.runtime.sendMessage({ type: 'ADMIN_REMOVE_LOCK', pin }, (r) => {
+    if (r && r.ok) {
+      setMsg('msg-unlock', 'success', '✔ Lock removed.');
+      document.getElementById('inp-unlock-pin').value = '';
+      setTimeout(showUnlockedState, 800);
+    } else {
+      const attempts = parseInt(document.getElementById('tamper-count').textContent || '0');
+      document.getElementById('tamper-count').textContent = attempts + 1;
+      setMsg('msg-unlock', 'error', 'Incorrect PIN. Attempt logged to audit system.');
+      document.getElementById('btn-remove-lock').disabled = false;
+    }
+  });
+});
+</script>
+
+</body>
+</html>

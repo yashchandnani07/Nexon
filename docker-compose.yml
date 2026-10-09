@@ -1,0 +1,386 @@
+services:
+
+  # ── Infrastructure (for dlp-gateway) ───────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dlp
+      POSTGRES_PASSWORD: dlp
+      POSTGRES_DB: dlp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dlp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aegisai-net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aegisai-net
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── DLP Gateway (FastAPI on :8001) ─────────────────────────────────────────
+  dlp-gateway:
+    build:
+      context: ./dlp-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file: ./dlp-gateway/.env
+    environment:
+      POSTGRES_URL: ${POSTGRES_URL:-postgresql+asyncpg://dlp:dlp@postgres:5432/dlp}
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      OLLAMA_URL: http://sandbox-ollama:11434
+    volumes:
+      - ./dlp-gateway:/app
+      - ./dlp-gateway/models:/app/models
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Sandbox — Ollama LLM runtime ───────────────────────────────────────────
+  sandbox-ollama:
+    image: ollama/ollama:latest
+    container_name: sandbox_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+      - ./sandbox/uploads:/uploads
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Sandbox — Model pre-loader (runs once) ─────────────────────────────────
+  sandbox-loader:
+    image: ollama/ollama:latest
+    container_name: sandbox_loader
+    depends_on:
+      - sandbox-ollama
+    entrypoint: >
+      /bin/sh -c "
+        sleep 15 &&
+        OLLAMA_HOST=http://sandbox-ollama:11434 ollama pull llama3 &&
+        echo 'Model ready'
+      "
+    restart: "no"
+    networks:
+      - aegisai-net
+
+  # ── Sandbox — Harness API (FastAPI on :8000) ───────────────────────────────
+  sandbox-harness:
+    build:
+      context: ./sandbox
+      dockerfile: docker/Dockerfile.harness
+    container_name: sandbox_harness
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sandbox/results:/app/results
+      - ./sandbox/payloads:/app/payloads
+      - ./sandbox/reports:/app/reports
+      - ./sandbox/ui:/app/ui
+      - ./sandbox/uploads:/app/uploads
+      - ./sandbox/uploads:/uploads
+    environment:
+      - OLLAMA_HOST=http://sandbox-ollama:11434
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+      - UPLOADS_DIR=/uploads
+      - RESULTS_DIR=/app/results
+      - REPORTS_DIR=/app/reports
+      - UI_DIR=/app/ui
+    depends_on:
+      - sandbox-ollama
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Credential Scanner ───────────────────────────────────────────────────
+  credential-scanner:
+    build:
+      context: ./Credential_Scanner-main
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Prompt Guard ─────────────────────────────────────────────────────────
+  prompt-guard:
+    build:
+      context: ./fraudshield-prompt-guard
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./prompt-injection/best_model:/app/prompt-injection/best_model:ro
+      - ./fraudshield-prompt-guard/models:/root/.cache/huggingface
+    environment:
+      LOCAL_GUARD_MODEL_PATH: /app/prompt-injection/best_model
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+      OLLAMA_HOST: http://sandbox-ollama:11434
+    depends_on:
+      - sandbox-ollama
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Voice Scanner ────────────────────────────────────────────────────────
+  voice-scanner:
+    build:
+      context: ./fraudshield-voice
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8000"
+    environment:
+      - OLLAMA_HOST=http://sandbox-ollama:11434
+      - DATABASE_URL=${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+    depends_on:
+      - sandbox-ollama
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Attachment Scanner ───────────────────────────────────────────────────
+  attachment-scanner:
+    build:
+      context: ./attachment_scanner
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      OLLAMA_HOST: http://sandbox-ollama:11434
+      OLLAMA_URL: http://sandbox-ollama:11434
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+    depends_on:
+      - sandbox-ollama
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Email Monitor ────────────────────────────────────────────────────────
+  email-monitor:
+    build:
+      context: ./email_monitoring
+      dockerfile: Dockerfile
+    ports:
+      - "8009:8009"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+      IMAP_ENABLED: "${IMAP_ENABLED:-false}"
+      IMAP_SERVER: "imap.gmail.com"
+      IMAP_PORT: "993"
+      IMAP_USE_SSL: "true"
+      IMAP_USER: "${IMAP_USER:-}"
+      IMAP_PASSWORD: "${IMAP_PASSWORD:-}"
+      IMAP_MAILBOX: "INBOX"
+      MAILHOG_URL: "http://mailhog:8025"
+      POLL_INTERVAL: "10"
+      OLLAMA_HOST: "http://sandbox-ollama:11434"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── SMTP Fraud Gateway — pre-delivery email interception ───────────────────
+  smtp-fraud-gateway:
+    build:
+      context: ./smtp-fraud-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8010:8010"
+      - "2525:2525"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+      EMAIL_MONITOR_URL: "http://email-monitor:8009"
+      GATEWAY_SMTP_PORT: "2525"
+      REJECT_THRESHOLD: "0.70"
+      QUARANTINE_THRESHOLD: "0.40"
+      TAG_THRESHOLD: "0.20"
+      MAILHOG_HOST: mailhog
+      MAILHOG_PORT: "1025"
+      PYTHONUNBUFFERED: "1"
+      OLLAMA_URL: "http://sandbox-ollama:11434"
+      LLAMA_MODEL: "llama3"
+      LLAMA_TIMEOUT: "45"
+      ATTACHMENT_SCANNER_URL: "http://attachment-scanner:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      email-monitor:
+        condition: service_started
+      mailhog:
+        condition: service_started
+      sandbox-ollama:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Website Spoofing ─────────────────────────────────────────────────────
+  website-spoofing:
+    build:
+      context: ./website_spoofing_model-main
+      dockerfile: Dockerfile
+    ports:
+      - "8008:5000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Retrain Scheduler — nightly automated model retraining ───────────────
+  retrain-scheduler:
+    build:
+      context: ./retrain-scheduler
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      RETRAIN_HOUR:   "2"
+      RETRAIN_MINUTE: "0"
+      RETRAIN_TZ:     "UTC"
+      VOICE_RETRAIN_URL:   "http://voice-scanner:8000/admin/retrain"
+      VOICE_STATUS_URL:    "http://voice-scanner:8000/admin/retrain/status"
+      WEBSITE_RETRAIN_URL: "http://website-spoofing:5000/admin/retrain"
+      WEBSITE_STATUS_URL:  "http://website-spoofing:5000/admin/retrain/status"
+      EMAIL_RETRAIN_URL:   "http://email-monitor:8009/admin/retrain"
+      EMAIL_STATUS_URL:    "http://email-monitor:8009/admin/retrain/status"
+      HTTP_TIMEOUT:   "600"
+      STATE_PATH:     "/data/scheduler_state.json"
+      DATABASE_URL:   ${DATABASE_URL:-postgresql://dlp:dlp@postgres:5432/dlp}
+    volumes:
+      - scheduler_data:/data
+    depends_on:
+      - voice-scanner
+      - website-spoofing
+      - email-monitor
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Outlook Plugin — HTTPS server + container API proxy ──────────────────
+  outlook-plugin:
+    build:
+      context: ./outlook-plugin
+      dockerfile: Dockerfile
+    container_name: fraudshield_plugin
+    ports:
+      - "3000:3000"
+    environment:
+      EMAIL_HOST:   email-monitor
+      EMAIL_PORT:   "8009"
+      VOICE_HOST:   voice-scanner
+      VOICE_PORT:   "8000"
+      CRED_HOST:    credential-scanner
+      CRED_PORT:    "8002"
+      GUARD_HOST:   prompt-guard
+      GUARD_PORT:   "8005"
+      ATTACH_HOST:  attachment-scanner
+      ATTACH_PORT:  "8007"
+      SMTP_HOST:    smtp-fraud-gateway
+      SMTP_PORT:    "8010"
+      WEBSITE_HOST: website-spoofing
+      WEBSITE_PORT: "5000"
+      CERT_DIR:     /root/.office-addin-dev-certs
+    volumes:
+      - plugin_certs:/root/.office-addin-dev-certs
+    depends_on:
+      - email-monitor
+      - voice-scanner
+      - credential-scanner
+      - prompt-guard
+      - attachment-scanner
+      - smtp-fraud-gateway
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+  # ── Frontend — Node build step ─────────────────────────────────────────────
+  frontend-builder:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    volumes:
+      - frontend_dist:/app/dist
+    restart: "no"
+    networks:
+      - aegisai-net
+
+  # ── Nginx — Unified reverse proxy + static frontend ───────────────────────
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - frontend_dist:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - dlp-gateway
+      - sandbox-harness
+      - frontend-builder
+      - credential-scanner
+      - prompt-guard
+      - voice-scanner
+      - attachment-scanner
+      - website-spoofing
+      - email-monitor
+      - retrain-scheduler
+    restart: unless-stopped
+    networks:
+      - aegisai-net
+
+volumes:
+  postgres_data:
+  ollama_models:
+  frontend_dist:
+  scheduler_data:
+  plugin_certs:
+
+networks:
+  aegisai-net:
+    driver: bridge

@@ -1,0 +1,62 @@
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sandbox_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+      - ./uploads:/uploads
+    networks:
+      - sandbox_net
+      - aegisai-net
+
+  model_loader:
+    image: ollama/ollama:latest
+    container_name: sandbox_loader
+    depends_on:
+      - ollama
+    entrypoint: >
+      /bin/sh -c "
+        sleep 10 &&
+        OLLAMA_HOST=http://ollama:11434 ollama pull tinyllama &&
+        echo 'Model ready'
+      "
+    restart: "no"
+    networks:
+      - sandbox_net
+
+  harness:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.harness
+    container_name: sandbox_harness
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./harness:/app/harness
+      - ./results:/app/results
+      - ./payloads:/app/payloads
+      - ./reports:/app/reports
+      - ./ui:/app/ui
+      - ./uploads:/app/uploads
+      - ./uploads:/uploads
+    environment:
+      - OLLAMA_HOST=http://sandbox_ollama:11434
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      - ollama
+    networks:
+      - sandbox_net
+      - aegisai-net
+
+networks:
+  sandbox_net:
+    driver: bridge
+  aegisai-net:
+    external: true
+    name: nexon-aegisai-net
+
+volumes:
+  ollama_models:
