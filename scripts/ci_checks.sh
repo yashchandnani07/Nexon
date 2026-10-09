@@ -7,7 +7,7 @@ fail=0
 
 check_files() {
   echo "== forbidden files"
-  bad=$(git ls-files | grep -E '(^|/)\.env($|\.local$)|\.(db|sqlite|sqlite3|pem|key|pfx|log)$|(^|/)(logs|plogs)\.txt$|__pycache__|(^|/)node_modules/|(^|/)Frontend/dist/|extracted_attachments/|(^|/)smtp-fraud-gateway-2/' || true)
+  bad=$(git ls-files | grep -E '\.env($|\.local$)|\.(db|sqlite|sqlite3|pem|key|pfx|log)$|(^|/)(logs|plogs)\.txt$|__pycache__|(^|/)node_modules/|(^|/)Frontend/dist/|extracted_attachments/|(^|/)smtp-fraud-gateway-2/' || true)
   if [ -n "$bad" ]; then echo "::error::These files must not be tracked:"; echo "$bad"; fail=1; else echo "ok"; fi
 }
 
