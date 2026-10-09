@@ -1,150 +1,156 @@
-name: CI - Build Check & Verification
+name: CI
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ── 1. Repository Hygiene Check ─────────────────────────────────────────────
-  hygiene:
-    name: Repository Hygiene & Secret Check
+  # 1. Repository checks: forbidden files, branding, secrets in contents, compose config
+  checks:
+    name: Repository checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Run scripts/ci_checks.sh
+        run: ./scripts/ci_checks.sh all
 
-      - name: Verify no forbidden artifacts or secrets are tracked
-        run: |
-          echo "Scanning tracked files for secrets and forbidden files..."
-          FORBIDDEN=$(git ls-files | grep -E '(\.env$|\.env\.local|\.db$|\.sqlite$|\.sqlite3$|logs\.txt$|plogs\.txt$|__pycache__|\.pem$|\.key$|\.pfx$)' || true)
-          if [ -n "$FORBIDDEN" ]; then
-            echo "::error::The following forbidden or sensitive files are tracked in git:"
-            echo "$FORBIDDEN"
-            echo "Please remove them using 'git rm --cached <file>' and ensure they are gitignored."
-            exit 1
-          fi
-          echo "✓ Hygiene check passed: No sensitive files or local databases committed."
-
-      - name: Validate Docker Compose Configuration (if present)
-        run: |
-          if [ -f "docker-compose.yml" ]; then
-            echo "Checking docker-compose.yml syntax..."
-            docker compose config --quiet || true
-            echo "✓ docker-compose.yml syntax is valid."
-          else
-            echo "docker-compose.yml not present on this branch yet; skipping."
-          fi
-
-  # ── 2. Dynamic Service Discovery ────────────────────────────────────────────
-  detect-services:
-    name: Detect Docker Services
+  # 2. Python syntax of every tracked .py file
+  python-syntax:
+    name: Python syntax
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile all tracked Python files
+        run: |
+          files=$(git ls-files '*.py')
+          if [ -z "$files" ]; then echo "no Python files"; exit 0; fi
+          echo "$files" | xargs python -m py_compile
+          echo "$(echo "$files" | wc -l) files compiled"
+
+  # 3. Find every service Dockerfile
+  detect-services:
+    name: Detect Docker services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       services: ${{ steps.detector.outputs.services }}
       has_services: ${{ steps.detector.outputs.has_services }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Discover Dockerfiles
         id: detector
         run: |
-          python3 -c "
-          import os, glob, json
-
-          dockerfiles = sorted(glob.glob('**/Dockerfile*', recursive=True))
+          python3 - <<'PY'
+          import glob, json, os
           targets = []
-          for df in dockerfiles:
-              # Skip non-service or generated files
-              if any(skip in df for skip in ['node_modules', '.git', 'smtp-fraud-gateway-2', '.gemini']):
+          for df in sorted(glob.glob('**/Dockerfile*', recursive=True)):
+              df = df.replace('\\', '/')
+              if any(s in df for s in ('node_modules', 'smtp-fraud-gateway-2', 'Dockerfile.garak')):
                   continue
-              df_clean = df.replace('\\\\', '/')
-              ctx = os.path.dirname(df_clean)
-              if 'sandbox/docker' in df_clean:
+              ctx = os.path.dirname(df) or '.'
+              if df.startswith('sandbox/docker/'):
                   ctx = 'sandbox'
-              elif ctx == '':
-                  ctx = '.'
-              targets.append({'name': df_clean, 'dockerfile': df_clean, 'context': ctx})
-
-          has_services = 'true' if len(targets) > 0 else 'false'
-          print(f'Discovered {len(targets)} Dockerfile(s):')
+              targets.append({'name': df.replace('/', '_').lower(), 'dockerfile': df, 'context': ctx})
+          print(f'{len(targets)} Dockerfile(s):')
           for t in targets:
-              print(f' - {t[\"dockerfile\"]} (context: {t[\"context\"]})')
-
+              print(f"  {t['dockerfile']} (context: {t['context']})")
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f'services={json.dumps(targets)}\n')
-              f.write(f'has_services={has_services}\n')
-          "
+              f.write(f"has_services={'true' if targets else 'false'}\n")
+          PY
 
-  # ── 3. Parallel Docker Build Matrix ─────────────────────────────────────────
+  # 4. Build every service image
   build-services:
-    name: Build (${{ matrix.target.dockerfile }})
-    needs: [hygiene, detect-services]
+    name: Build ${{ matrix.target.dockerfile }}
+    needs: [checks, detect-services]
     if: needs.detect-services.outputs.has_services == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         target: ${{ fromJson(needs.detect-services.outputs.services) }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image (${{ matrix.target.dockerfile }})
+      - uses: actions/checkout@v4
+      - name: Free disk space (ML images are large)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL || true
+          df -h /
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.target.dockerfile }}
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.target.context }}
           file: ${{ matrix.target.dockerfile }}
           push: false
-          load: true
-          tags: test-service:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ci-${{ matrix.target.name }}:latest
+          cache-from: type=gha,scope=${{ matrix.target.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.name }}
 
-  # ── 4. Frontend Standalone Validation (if Frontend present) ─────────────────
-  frontend-check:
-    name: Frontend Build Check
-    needs: [hygiene]
+  # 5. Frontend: reproducible install and production build
+  frontend:
+    name: Frontend build
+    needs: [checks]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check for Frontend module
-        id: check_fe
+      - uses: actions/checkout@v4
+      - name: Detect Frontend
+        id: fe
         run: |
-          if [ -d "Frontend" ] && [ -f "Frontend/package.json" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+          if [ -f Frontend/package.json ]; then
+            if [ ! -f Frontend/package-lock.json ]; then
+              echo "::error::Frontend/package.json exists but Frontend/package-lock.json is missing. Run npm install and commit the lock file."
+              exit 1
+            fi
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Frontend not on this branch yet, skipped"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Set up Node.js 20
-        if: steps.check_fe.outputs.exists == 'true'
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
+        if: steps.fe.outputs.exists == 'true'
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: Frontend/package-lock.json
+      - name: Install (npm ci)
+        if: steps.fe.outputs.exists == 'true'
+        working-directory: Frontend
+        run: npm ci
+      - name: Build
+        if: steps.fe.outputs.exists == 'true'
+        working-directory: Frontend
+        run: npm run build
 
-      - name: Install dependencies
-        if: steps.check_fe.outputs.exists == 'true'
+  # 6. Single required status for branch protection
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [checks, python-syntax, detect-services, build-services, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed or was cancelled
         run: |
-          cd Frontend
-          npm ci || npm install
-
-      - name: Build Frontend bundle
-        if: steps.check_fe.outputs.exists == 'true'
-        run: |
-          cd Frontend
-          npm run build
+          echo '${{ toJson(needs) }}' | python3 -c '
+          import json, sys
+          needs = json.load(sys.stdin)
+          bad = {k: v["result"] for k, v in needs.items() if v["result"] not in ("success", "skipped")}
+          print(bad or "all jobs passed or skipped")
+          sys.exit(1 if bad else 0)
+          '

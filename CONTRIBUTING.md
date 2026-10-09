@@ -68,10 +68,21 @@ git push -u origin feat/<issue-number>-<short-name>
 
 ## 3. `main` must always build
 
-Every Pull Request automatically triggers the GitHub Actions CI pipeline (`.github/workflows/ci.yml`), which:
-1. Verifies repository hygiene (ensuring no secrets, `.env`, or local `*.db` files are committed).
-2. Dynamically discovers all Docker services in the repository and verifies they build successfully.
-3. Validates the frontend build bundle if `Frontend/` is present.
+Every pull request runs the CI (`.github/workflows/ci.yml`). A PR with a red check is not merged.
+
+| Job | Fails when |
+|---|---|
+| Repository checks | a `.env`, `*.db`, log, `__pycache__`, `node_modules`, `dist` or `extracted_attachments` file is tracked; branding (bank or event names) appears anywhere; a token, private key, database URL with credentials or hardcoded password appears in code; `docker-compose.yml` is invalid |
+| Python syntax | any tracked `.py` file does not compile |
+| Build (one per Dockerfile) | a service image does not build |
+| Frontend build | `package-lock.json` is missing, `npm ci` fails, or `npm run build` fails |
+| CI passed | any job above failed (this is the one required status) |
+
+Run the repository checks before you push:
+
+```bash
+./scripts/ci_checks.sh all
+```
 
 Before every PR, also build your service locally:
 
