@@ -58,6 +58,18 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/email/, ''),
         changeOrigin: true,
       },
+      // SMTP Fraud Gateway
+      '/api/smtp-gateway': {
+        target: 'http://localhost:8010',
+        rewrite: (path) => path.replace(/^\/api\/smtp-gateway/, ''),
+        changeOrigin: true,
+      },
+      // Retrain Scheduler
+      '/api/retrain-scheduler': {
+        target: 'http://localhost:9000',
+        rewrite: (path) => path.replace(/^\/api\/retrain-scheduler/, ''),
+        changeOrigin: true,
+      },
       // Legacy WS
       '/ws/live': {
         target: 'ws://localhost:8001',
