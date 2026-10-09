@@ -1,0 +1,56 @@
+# ── Secrets (never commit) ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# ── Python ────────────────────────────────────────────────────────────────────
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+Frontend/dist/
+
+# ── Model weights (too large for git, downloaded or trained at build time) ────
+models/
+*.bin
+*.pt
+*.safetensors
+*.gguf
+*.joblib
+*.pkl
+
+# ── Local databases (the shared Postgres is the only source of truth) ─────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Runtime output and personal data ──────────────────────────────────────────
+*.log
+logs.txt
+plogs.txt
+email_monitoring/extracted_attachments/
+fraudshield-voice/outputs/
+website_spoofing_model-main/outputs/
+smtp-fraud-gateway/data/
+sandbox/uploads/
+sandbox/results/*
+!sandbox/results/.gitkeep
+attachment_scanner/temp_uploads/
+temp_uploads/
+
+# ── Large third-party datasets ────────────────────────────────────────────────
+attachment_scanner/malwarebazaar_full.csv
+*.yar
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
