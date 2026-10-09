@@ -65,7 +65,7 @@ jobs:
               ctx = os.path.dirname(df) or '.'
               if df.startswith('sandbox/docker/'):
                   ctx = 'sandbox'
-              targets.append({'name': df.replace('/', '_'), 'dockerfile': df, 'context': ctx})
+              targets.append({'name': df.replace('/', '_').lower(), 'dockerfile': df, 'context': ctx})
           print(f'{len(targets)} Dockerfile(s):')
           for t in targets:
               print(f"  {t['dockerfile']} (context: {t['context']})")
