@@ -68,7 +68,12 @@ git push -u origin feat/<issue-number>-<short-name>
 
 ## 3. `main` must always build
 
-Before every PR, build your service:
+Every Pull Request automatically triggers the GitHub Actions CI pipeline (`.github/workflows/ci.yml`), which:
+1. Verifies repository hygiene (ensuring no secrets, `.env`, or local `*.db` files are committed).
+2. Dynamically discovers all Docker services in the repository and verifies they build successfully.
+3. Validates the frontend build bundle if `Frontend/` is present.
+
+Before every PR, also build your service locally:
 
 ```bash
 docker compose build <service-name>

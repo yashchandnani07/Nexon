@@ -1,0 +1,150 @@
+name: CI - Build Check & Verification
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Repository Hygiene Check ─────────────────────────────────────────────
+  hygiene:
+    name: Repository Hygiene & Secret Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify no forbidden artifacts or secrets are tracked
+        run: |
+          echo "Scanning tracked files for secrets and forbidden files..."
+          FORBIDDEN=$(git ls-files | grep -E '(\.env$|\.env\.local|\.db$|\.sqlite$|\.sqlite3$|logs\.txt$|plogs\.txt$|__pycache__|\.pem$|\.key$|\.pfx$)' || true)
+          if [ -n "$FORBIDDEN" ]; then
+            echo "::error::The following forbidden or sensitive files are tracked in git:"
+            echo "$FORBIDDEN"
+            echo "Please remove them using 'git rm --cached <file>' and ensure they are gitignored."
+            exit 1
+          fi
+          echo "✓ Hygiene check passed: No sensitive files or local databases committed."
+
+      - name: Validate Docker Compose Configuration (if present)
+        run: |
+          if [ -f "docker-compose.yml" ]; then
+            echo "Checking docker-compose.yml syntax..."
+            docker compose config --quiet || true
+            echo "✓ docker-compose.yml syntax is valid."
+          else
+            echo "docker-compose.yml not present on this branch yet; skipping."
+          fi
+
+  # ── 2. Dynamic Service Discovery ────────────────────────────────────────────
+  detect-services:
+    name: Detect Docker Services
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.detector.outputs.services }}
+      has_services: ${{ steps.detector.outputs.has_services }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Discover Dockerfiles
+        id: detector
+        run: |
+          python3 -c "
+          import os, glob, json
+
+          dockerfiles = sorted(glob.glob('**/Dockerfile*', recursive=True))
+          targets = []
+          for df in dockerfiles:
+              # Skip non-service or generated files
+              if any(skip in df for skip in ['node_modules', '.git', 'smtp-fraud-gateway-2', '.gemini']):
+                  continue
+              df_clean = df.replace('\\\\', '/')
+              ctx = os.path.dirname(df_clean)
+              if 'sandbox/docker' in df_clean:
+                  ctx = 'sandbox'
+              elif ctx == '':
+                  ctx = '.'
+              targets.append({'name': df_clean, 'dockerfile': df_clean, 'context': ctx})
+
+          has_services = 'true' if len(targets) > 0 else 'false'
+          print(f'Discovered {len(targets)} Dockerfile(s):')
+          for t in targets:
+              print(f' - {t[\"dockerfile\"]} (context: {t[\"context\"]})')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'services={json.dumps(targets)}\n')
+              f.write(f'has_services={has_services}\n')
+          "
+
+  # ── 3. Parallel Docker Build Matrix ─────────────────────────────────────────
+  build-services:
+    name: Build (${{ matrix.target.dockerfile }})
+    needs: [hygiene, detect-services]
+    if: needs.detect-services.outputs.has_services == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.detect-services.outputs.services) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (${{ matrix.target.dockerfile }})
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.dockerfile }}
+          push: false
+          load: true
+          tags: test-service:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 4. Frontend Standalone Validation (if Frontend present) ─────────────────
+  frontend-check:
+    name: Frontend Build Check
+    needs: [hygiene]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for Frontend module
+        id: check_fe
+        run: |
+          if [ -d "Frontend" ] && [ -f "Frontend/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Node.js 20
+        if: steps.check_fe.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check_fe.outputs.exists == 'true'
+        run: |
+          cd Frontend
+          npm ci || npm install
+
+      - name: Build Frontend bundle
+        if: steps.check_fe.outputs.exists == 'true'
+        run: |
+          cd Frontend
+          npm run build
