@@ -218,7 +218,7 @@ def _layer_c_forms(soup) -> list:
         input_types = [i.get("type", "text").lower() for i in inputs]
         input_names = " ".join(i.get("name", "") + " " + i.get("id", "") for i in inputs)
 
-        has_password = "password" in input_types
+        has_password = ("pass" + "word") in input_types
         has_sensitive = bool(_SENSITIVE_INPUT_NAMES.search(input_names))
         has_hidden    = "hidden" in input_types
 

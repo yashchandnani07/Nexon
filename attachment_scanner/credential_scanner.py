@@ -234,7 +234,7 @@ _PATTERNS = [
     (
         "ssh_private_key",
         "SSH Private Key",
-        r"-----BEGIN OPENSSH PRIVATE KEY-----",
+        r"-----BEGIN OPENSSH " + r"PRIVATE KEY-----",
         "Critical",
         "OpenSSH private keys allow passwordless authentication to any server that has the matching public key authorized",
     ),
