@@ -1,0 +1,66 @@
+Windows Registry Editor Version 5.00
+
+; ════════════════════════════════════════════════════════════════════════════
+; AegisAI DLP Guardian — Chrome Enterprise Force-Install Policy
+;
+; PURPOSE:
+;   This registry file configures Chrome to FORCE-INSTALL the DLP Guardian
+;   extension on all employee machines. Employees CANNOT remove, disable,
+;   or bypass a force-installed extension.
+;
+; HOW TO DEPLOY:
+;   Option A (Manual):
+;     1. Replace YOUR_EXTENSION_ID below with the actual Chrome Extension ID
+;        (found at chrome://extensions/ after loading the extension)
+;     2. Replace UPDATE_URL with your hosted update_manifest.xml URL
+;        (or use the Chrome Web Store URL if published there)
+;     3. Double-click this .reg file on each employee machine as Administrator
+;     4. Restart Chrome — the extension will be force-installed and LOCKED
+;
+;   Option B (Group Policy / SCCM / Intune):
+;     Import this into your Windows GPO under:
+;       Computer Configuration → Administrative Templates → Google → Chrome →
+;       Extensions → Configure the list of force-installed apps and extensions
+;
+;   Option C (Chrome Browser Cloud Management):
+;     Add the Extension ID to "Force-installed apps and extensions" in the
+;     Google Admin Console under Device Management → Chrome → Apps & Extensions
+;
+; WHAT THIS DOES:
+;   – ExtensionInstallForcelist: Chrome force-installs the extension silently
+;   – ExtensionInstallBlocklist: Prevents manual removal of any extension not
+;     in the allowlist (optional — see commented line below)
+;   – ExtensionSettings: Locks the specific extension so it cannot be removed
+;     or disabled by the user regardless of Chrome settings
+;
+; NOTE: Replace placeholders before deploying!
+; ════════════════════════════════════════════════════════════════════════════
+
+
+; ── Force-install the extension ──────────────────────────────────────────────
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist]
+"1"="YOUR_EXTENSION_ID;https://clients2.google.com/service/update2/crx"
+
+; ── Extension-level settings: block removal and disable ──────────────────────
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionSettings]
+; This JSON string locks the specific extension.
+; Replace YOUR_EXTENSION_ID with the real ID.
+"YOUR_EXTENSION_ID"="{\"installation_mode\":\"force_installed\",\"update_url\":\"https://clients2.google.com/service/update2/crx\",\"blocked_permissions\":[],\"toolbar_pin\":\"force_pinned\",\"runtime_blocked_hosts\":[],\"runtime_allowed_hosts\":[\"<all_urls>\"]}"
+
+; ── Prevent any extension from being manually removed (optional, stricter) ───
+; Uncomment the line below to enable (this blocks ALL extension management by users)
+; [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+; "ExtensionInstallBlocklist"="*"
+
+; ── Prevent Chrome extensions page from showing the Remove button ─────────────
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"BrowserSignin"=dword:00000001
+"ExtensionManifestV2Availability"=dword:00000002
+
+; ════════════════════════════════════════════════════════════════════════════
+; HOW TO FIND YOUR EXTENSION ID:
+;   1. Open Chrome → chrome://extensions/
+;   2. Enable "Developer mode" (top right toggle)
+;   3. Load the extension → copy the 32-character ID shown below the name
+;   4. Paste it in place of YOUR_EXTENSION_ID everywhere in this file
+; ════════════════════════════════════════════════════════════════════════════
